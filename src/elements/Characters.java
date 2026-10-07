@@ -1,14 +1,13 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Interface.java to edit this template
- */
 package elements;
 
+import br.com.davidbuzatto.jsge.core.engine.EngineFrame;
+
 /**
- *
- * @author raul
+ * Interface base para personagens do jogo (Jogador, Inimigos, etc.).
  */
 public interface Characters {
-    
-    
+    void update(double delta);
+    void draw(EngineFrame e);
+    float getX();
+    float getY();
 }

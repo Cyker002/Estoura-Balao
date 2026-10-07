@@ -47,6 +47,13 @@ public class TelaJogo implements Tela {
     private String feedbackMensagem = "";
     private double feedbackTimer = 0.0;
     private Color corFeedback = Color.WHITE;
+
+    // Estrutura de Dados em Tempo Real: ArrayList de Balões visível na tela
+    private List<Balloon> listaBaloes;
+    private String logOperacaoLista = "new ArrayList<>()";
+    private Color corLogOperacao = new Color(130, 200, 255);
+    private int ultimoIndiceModificado = -1;
+    private double timerDestaqueSlot = 0.0;
     
     // Dimensões da tela e layout
     private static final int LARGURA_TELA = 800;
@@ -64,10 +71,11 @@ public class TelaJogo implements Tela {
 
     @Override
     public void create() {
-        // Inicializa o personagem no centro do chãozinho
-        player = new Player(LARGURA_TELA / 2.0f, Y_CHAO - 5.0f);
+        // Inicializa o personagem no centro da área útil de jogo (à esquerda do painel lateral)
+        player = new Player(315.0f, Y_CHAO - 5.0f);
         
         inimigos = new ArrayList<>();
+        listaBaloes = new ArrayList<>();
         particulas = new ArrayList<>();
         caneta = new Caneta();
         recognizer = new UnistrokeRecognize();
@@ -82,6 +90,11 @@ public class TelaJogo implements Tela {
         tempoDeJogo = 0.0;
         nivelVelocidade = 0;
         
+        logOperacaoLista = "new ArrayList<>()";
+        corLogOperacao = new Color(130, 200, 255);
+        ultimoIndiceModificado = -1;
+        timerDestaqueSlot = 0.0;
+
         feedbackMensagem = "Desenhe os símbolos dos balões para estourá-los!";
         feedbackTimer = 3.5;
         corFeedback = new Color(255, 230, 120);
@@ -150,6 +163,14 @@ public class TelaJogo implements Tela {
             spawnarInimigo();
         }
 
+        // Timer de destaque do slot no painel ArrayList
+        if (timerDestaqueSlot > 0) {
+            timerDestaqueSlot -= delta;
+            if (timerDestaqueSlot <= 0) {
+                ultimoIndiceModificado = -1;
+            }
+        }
+
         // 3. Atualização dos Inimigos
         Iterator<Enemies> itInimigos = inimigos.iterator();
         while (itInimigos.hasNext()) {
@@ -160,6 +181,21 @@ public class TelaJogo implements Tela {
             if (!inimigo.isFalling() && inimigo.getY() >= Y_CHAO) {
                 vidas--;
                 criarExplosao(inimigo.getX(), Y_CHAO, Color.RED, 25);
+                
+                // Remove balões sobreviventes deste inimigo da lista
+                for (Balloon b : inimigo.getBalloons()) {
+                    if (!b.isBurst()) {
+                        int idxRem = listaBaloes.indexOf(b);
+                        if (idxRem != -1) {
+                            listaBaloes.remove(idxRem);
+                            logOperacaoLista = "remove(" + idxRem + ") [colisão chão]";
+                            corLogOperacao = new Color(255, 90, 90);
+                            ultimoIndiceModificado = idxRem;
+                            timerDestaqueSlot = 1.0;
+                        }
+                    }
+                }
+
                 itInimigos.remove();
                 if (vidas <= 0) {
                     gameOver = true;
@@ -169,6 +205,9 @@ public class TelaJogo implements Tela {
 
             // Inimigo derrotado que caiu fora da tela
             if (inimigo.isDefeated()) {
+                for (Balloon b : inimigo.getBalloons()) {
+                    listaBaloes.remove(b);
+                }
                 itInimigos.remove();
             }
         }
@@ -245,6 +284,16 @@ public class TelaJogo implements Tela {
                     for (Balloon b : estourados) {
                         baloesEstourados++;
                         criarExplosao(inimigo.getX(), inimigo.getY() - 68, b.getColor(), 18);
+
+                        // Remove da estrutura de dados ArrayList e atualiza o painel
+                        int idxRem = listaBaloes.indexOf(b);
+                        if (idxRem != -1) {
+                            listaBaloes.remove(idxRem);
+                            ultimoIndiceModificado = idxRem;
+                            timerDestaqueSlot = 1.4;
+                            logOperacaoLista = "remove(" + idxRem + ") -> shift";
+                            corLogOperacao = new Color(255, 140, 80);
+                        }
                     }
                 }
 
@@ -282,7 +331,8 @@ public class TelaJogo implements Tela {
     }
 
     private void spawnarInimigo() {
-        float x = 70 + random.nextInt(LARGURA_TELA - 140);
+        // Gera inimigos na área de jogo à esquerda do painel da estrutura de dados
+        float x = 70 + random.nextInt(480);
         float y = -45;
 
         int qtdBaloes = 1;
@@ -305,6 +355,16 @@ public class TelaJogo implements Tela {
         float velocidadeBase = 35.0f + (nivelVelocidade * INCREMENTO_VELOCIDADE);
         novoInimigo.setSpeed(velocidadeBase + random.nextFloat() * 20.0f);
         inimigos.add(novoInimigo);
+
+        // Adiciona os novos balões ao ArrayList monitorado na tela
+        for (Balloon b : novoInimigo.getBalloons()) {
+            listaBaloes.add(b);
+        }
+        int ultimoIdx = listaBaloes.size() - 1;
+        ultimoIndiceModificado = ultimoIdx;
+        timerDestaqueSlot = 1.2;
+        logOperacaoLista = "add(b) no índice [" + ultimoIdx + "]";
+        corLogOperacao = new Color(80, 240, 130);
     }
 
     private void criarExplosao(double x, double y, Color cor, int quantidade) {
@@ -347,6 +407,9 @@ public class TelaJogo implements Tela {
 
         // - Pontuação no canto superior direito
         desenharPontuacao(janela);
+
+        // - Painel lateral da estrutura de dados ArrayList de balões funcionando
+        desenharPainelArrayList(janela);
 
         // - Feedback do gesto e vidas restantes
         desenharStatus(janela);
@@ -444,6 +507,139 @@ public class TelaJogo implements Tela {
     }
 
     /**
+     * Desenha o painel lateral que representa visualmente a estrutura de dados
+     * ArrayList<Balloon> em tempo real durante a partida.
+     */
+    private void desenharPainelArrayList(JanelaAtiva janela) {
+        int panelX = 600;
+        int panelY = 60;
+        int panelW = 180;
+        int panelH = 320;
+
+        // 1. Fundo do painel lateral com estilo semi-transparente elegante
+        janela.fillRectangle(panelX, panelY, panelW, panelH, new Color(22, 26, 44, 215));
+        janela.drawRectangle(panelX, panelY, panelW, panelH, new Color(80, 95, 140));
+        janela.drawRectangle(panelX + 1, panelY + 1, panelW - 2, panelH - 2, new Color(40, 50, 75));
+
+        // 2. Cabeçalho da estrutura de dados
+        janela.drawText("ESTRUTURA DE DADOS", panelX + 10, panelY + 10, 10, new Color(130, 185, 245));
+        janela.drawText("ArrayList<Balloon>", panelX + 10, panelY + 23, 14, Color.YELLOW);
+
+        int tam = (listaBaloes != null) ? listaBaloes.size() : 0;
+        String infoCapacidade = "size: " + tam + " | cap. visual: 6";
+        janela.drawText(infoCapacidade, panelX + 10, panelY + 40, 11, new Color(200, 215, 235));
+
+        // Linha divisória
+        janela.drawLine(panelX + 8, panelY + 54, panelX + panelW - 8, panelY + 54, new Color(60, 75, 110));
+
+        // 3. Slots de memória indexados do ArrayList (índices [0] a [5])
+        int maxSlots = 6;
+        int slotH = 34;
+        int startSlotY = panelY + 60;
+
+        for (int i = 0; i < maxSlots; i++) {
+            int slotY = startSlotY + (i * (slotH + 4));
+            int boxX = panelX + 34;
+            int boxW = panelW - 44; // 136 px
+
+            // Rótulo do índice [i]
+            Color corIndice = (i < tam) ? new Color(120, 200, 255) : new Color(120, 130, 150);
+            janela.drawText("[" + i + "]", panelX + 8, slotY + 11, 11, corIndice);
+
+            boolean slotOcupado = (i < tam);
+            boolean slotDestacado = (i == ultimoIndiceModificado && timerDestaqueSlot > 0);
+
+            if (slotOcupado) {
+                Balloon b = listaBaloes.get(i);
+
+                // Fundo do slot ocupado com destaque visual para alterações recentes
+                Color corFundoSlot = slotDestacado ? new Color(45, 65, 105, 240) : new Color(30, 36, 60, 210);
+                Color corBordaSlot = slotDestacado ? corLogOperacao : new Color(65, 80, 120);
+
+                janela.fillRectangle(boxX, slotY, boxW, slotH, corFundoSlot);
+                janela.drawRectangle(boxX, slotY, boxW, slotH, corBordaSlot);
+
+                // Mini balãozinho
+                double bx = boxX + 16.0;
+                double by = slotY + 17.0;
+                double br = 8.5;
+
+                janela.fillCircle(bx, by, br, b.getColor());
+                janela.drawCircle(bx, by, br, new Color(20, 20, 20, 160));
+                janela.fillCircle(bx, by + br, 1.8, b.getColor().darker());
+
+                // Desenho do símbolo dentro do mini balão
+                desenharMiniSimbolo(janela, b.getSymbol(), bx, by);
+
+                // Nome do símbolo no slot
+                String nomeSimb = nomeCurto(b.getSymbol());
+                janela.drawText(nomeSimb, boxX + 32, slotY + 11, 11, Color.WHITE);
+
+            } else {
+                // Slot vazio / livre (null)
+                janela.fillRectangle(boxX, slotY, boxW, slotH, new Color(18, 22, 36, 140));
+                janela.drawRectangle(boxX, slotY, boxW, slotH, new Color(45, 52, 75));
+                janela.drawText("null (livre)", boxX + 28, slotY + 11, 10, new Color(100, 112, 135));
+            }
+        }
+
+        // Indicador caso haja mais balões que o limite visual dos 6 slots
+        if (tam > maxSlots) {
+            String excedente = "+ " + (tam - maxSlots) + " no array...";
+            janela.drawText(excedente, panelX + 38, startSlotY + (5 * (slotH + 4)) + 24, 9, Color.YELLOW);
+        }
+
+        // 4. Rodapé do painel com a última operação executada (add ou remove com shift)
+        int footerY = panelY + panelH - 24;
+        janela.drawLine(panelX + 8, footerY - 5, panelX + panelW - 8, footerY - 5, new Color(60, 75, 110));
+        janela.drawText("Op: " + logOperacaoLista, panelX + 10, footerY + 4, 10, corLogOperacao);
+    }
+
+    private void desenharMiniSimbolo(JanelaAtiva janela, Symbol s, double bx, double by) {
+        if (s == null) return;
+        Color sc = Color.WHITE;
+        double sz = 4.0;
+
+        switch (s) {
+            case LINHA_HORIZONTAL:
+                janela.drawLine(bx - sz, by, bx + sz, by, sc);
+                break;
+            case LINHA_VERTICAL:
+                janela.drawLine(bx, by - sz, bx, by + sz, sc);
+                break;
+            case V_NORMAL:
+                janela.drawLine(bx - sz, by - sz + 1, bx, by + sz, sc);
+                janela.drawLine(bx, by + sz, bx + sz, by - sz + 1, sc);
+                break;
+            case V_INVERTIDO:
+                janela.drawLine(bx - sz, by + sz - 1, bx, by - sz, sc);
+                janela.drawLine(bx, by - sz, bx + sz, by + sz - 1, sc);
+                break;
+            case CIRCULO:
+                janela.drawCircle(bx, by, sz - 1, sc);
+                break;
+            case Z:
+                janela.drawLine(bx - sz, by - sz, bx + sz, by - sz, sc);
+                janela.drawLine(bx + sz, by - sz, bx - sz, by + sz, sc);
+                janela.drawLine(bx - sz, by + sz, bx + sz, by + sz, sc);
+                break;
+        }
+    }
+
+    private String nomeCurto(Symbol s) {
+        if (s == null) return "Balão";
+        switch (s) {
+            case LINHA_HORIZONTAL: return "Linha (—)";
+            case LINHA_VERTICAL:   return "Vertical (|)";
+            case V_NORMAL:         return "V";
+            case V_INVERTIDO:      return "V Invert. (^)";
+            case CIRCULO:          return "Círculo (O)";
+            case Z:                return "Z";
+            default:               return s.name();
+        }
+    }
+
+    /**
      * Mostra vidas e a mensagem de feedback do último gesto desenhado.
      */
     private void desenharStatus(JanelaAtiva janela) {
@@ -490,19 +686,25 @@ public class TelaJogo implements Tela {
         janela.fillRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, new Color(0, 0, 0, 185));
 
         // Painel central de Pause
-        int px = 240;
-        int py = 120;
-        int pw = 350;
-        int ph = 200;
+        int pw = 430;
+        int ph = 210;
+        int px = (LARGURA_TELA - pw) / 2;
+        int py = (ALTURA_TELA - ph) / 2;
+
         janela.fillRectangle(px, py, pw, ph, new Color(28, 32, 52));
         janela.drawRectangle(px, py, pw, ph, new Color(90, 110, 170));
         janela.drawRectangle(px + 2, py + 2, pw - 4, ph - 4, new Color(90, 110, 170));
 
-        janela.drawText("PAUSADO", px + 95, py + 30, 26, Color.WHITE);
+        // Título centralizado
+        String titPause = "PAUSADO";
+        int titW = janela.measureText(titPause, 26);
+        janela.drawText(titPause, px + (pw - titW) / 2, py + 32, 26, Color.WHITE);
 
-        janela.drawText("► Pressione ESPAÇO ou P para Continuar", px + 25, py + 90, 14, Color.YELLOW);
-        janela.drawText("► Pressione R para Reiniciar", px + 25, py + 125, 14, new Color(200, 215, 240));
-        janela.drawText("► Pressione M para Menu Principal", px + 25, py + 160, 14, new Color(200, 215, 240));
+        // Opções de controle alinhadas com margem interna confortável
+        int opX = px + 40;
+        janela.drawText("► Pressione ESPAÇO ou P para Continuar", opX, py + 90, 14, Color.YELLOW);
+        janela.drawText("► Pressione R para Reiniciar", opX, py + 125, 14, new Color(200, 215, 240));
+        janela.drawText("► Pressione M para Menu Principal", opX, py + 160, 14, new Color(200, 215, 240));
     }
 
     private void desenharGameOver(JanelaAtiva janela) {

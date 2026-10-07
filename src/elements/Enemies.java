@@ -1,16 +1,22 @@
 package elements;
 
 import br.com.davidbuzatto.jsge.core.engine.EngineFrame;
+import br.com.davidbuzatto.jsge.image.Image;
+import br.com.davidbuzatto.jsge.image.ImageUtils;
 import java.awt.Color;
+import java.io.File;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Representa um inimigo que desce pela tela sustentado por um ou mais balões.
- * O desenho do corpo do inimigo está isolado no método desenharCorpoInimigo,
- * facilitando para você plugar seus próprios desenhos ou sprites depois.
+ * Agora utiliza o sprite da caveira pixel art fornecido.
  */
 public class Enemies implements Characters {
+    private static Image spriteInimigo = null;
+    private static boolean tentouCarregar = false;
+
     private List<Balloon> balloons;
     private float x;
     private float y;
@@ -19,26 +25,51 @@ public class Enemies implements Characters {
     private boolean falling = false;
     private boolean defeated = false;
     private double animTime = 0.0;
-    private int width = 36;
-    private int height = 36;
+    private int width = 44;
+    private int height = 84;
     private Color enemyColor = new Color(50, 50, 70);
+
+    private static void carregarSprite() {
+        if (tentouCarregar) return;
+        tentouCarregar = true;
+        try {
+            URL url = Enemies.class.getResource("/resources/inimigo.png");
+            if (url != null) {
+                spriteInimigo = ImageUtils.loadImage(url);
+            } else {
+                File f = new File("src/resources/inimigo.png");
+                if (f.exists()) {
+                    spriteInimigo = ImageUtils.loadImage(f.getPath());
+                } else {
+                    f = new File("resources/inimigo.png");
+                    if (f.exists()) {
+                        spriteInimigo = ImageUtils.loadImage(f.getPath());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            System.err.println("Aviso: Falha ao carregar sprite do inimigo: " + ex.getMessage());
+        }
+    }
 
     public Enemies(float x, float y, Symbol... symbols) {
         this.x = x;
         this.y = y;
-        this.balloons = new ArrayList<>();
+        balloons = new ArrayList<>();
         for (Symbol s : symbols) {
             this.balloons.add(new Balloon(s));
         }
+        carregarSprite();
     }
 
     public Enemies(float x, float y, List<Symbol> symbols) {
         this.x = x;
         this.y = y;
-        this.balloons = new ArrayList<>();
+        balloons = new ArrayList<>();
         for (Symbol s : symbols) {
             this.balloons.add(new Balloon(s));
         }
+        carregarSprite();
     }
 
     @Override
@@ -147,25 +178,29 @@ public class Enemies implements Characters {
         // 1. Desenha os balões ativos e suas cordas
         desenharBaloes(e, currentX, currentY);
 
-        // 2. Desenha o corpo do inimigo (método separado para você customizar o visual depois)
+        // 2. Desenha o corpo do inimigo usando o sprite da caveira
         desenharCorpoInimigo(e, currentX, currentY);
     }
 
     private void desenharBaloes(EngineFrame e, double currentX, double currentY) {
         int totalBalloons = balloons.size();
         double balloonRadius = 20.0;
-        double spacing = 36.0;
+        double spacing = 38.0;
         double startOffsetX = -((totalBalloons - 1) * spacing) / 2.0;
+
+        // Conexão da corda no topo do sprite da caveira
+        double conexaoTopo = currentY - (spriteInimigo != null ? 36.0 : height / 2.0);
+        double distBalao = spriteInimigo != null ? 68.0 : 50.0;
 
         for (int i = 0; i < totalBalloons; i++) {
             Balloon b = balloons.get(i);
             if (b.isBurst()) continue;
 
             double bx = currentX + startOffsetX + (i * spacing);
-            double by = currentY - 50.0 - (Math.abs(startOffsetX + (i * spacing)) * 0.2);
+            double by = currentY - distBalao - (Math.abs(startOffsetX + (i * spacing)) * 0.2);
 
-            // Corda do balão até o topo da cabeça do inimigo
-            e.drawLine(currentX, currentY - height / 2.0, bx, by + balloonRadius, new Color(90, 90, 90));
+            // Corda do balão até o topo da caveira
+            e.drawLine(currentX, conexaoTopo, bx, by + balloonRadius, new Color(90, 90, 90));
 
             // Balão (círculo preenchido + borda)
             Color bColor = b.getColor();
@@ -181,26 +216,36 @@ public class Enemies implements Characters {
     }
 
     /**
-     * =========================================================================
-     * DESENHO DO CORPO DO INIMIGO:
-     * Você pode customizar este método livremente quando decidir o desenho final
-     * (por exemplo: carregar uma imagem/sprite ou desenhar outro monstrinho).
-     * =========================================================================
+     * Desenha o corpo do inimigo usando o sprite da caveira carregado.
      */
     public void desenharCorpoInimigo(EngineFrame e, double currentX, double currentY) {
-        // Corpo base
+        carregarSprite();
+        if (spriteInimigo != null) {
+            double imgW = spriteInimigo.getWidth();
+            double imgH = spriteInimigo.getHeight();
+            double imgX = currentX - imgW / 2.0;
+            double imgY = currentY - imgH / 2.0;
+
+            if (falling) {
+                // Efeito de queda: leve tremor de pânico
+                double tremor = Math.sin(animTime * 25.0) * 3.0;
+                e.drawImage(spriteInimigo, imgX + tremor, imgY);
+            } else {
+                e.drawImage(spriteInimigo, imgX, imgY);
+            }
+            return;
+        }
+
+        // Fallback visual caso a imagem não esteja acessível:
         e.fillCircle(currentX, currentY, width / 2.0, enemyColor);
         e.drawCircle(currentX, currentY, width / 2.0, Color.BLACK);
 
-        // Olhos
         if (falling) {
-            // Olhos em "X" (assustado caindo)
             e.drawLine(currentX - 8, currentY - 4, currentX - 2, currentY + 2, Color.WHITE);
             e.drawLine(currentX - 2, currentY - 4, currentX - 8, currentY + 2, Color.WHITE);
             e.drawLine(currentX + 2, currentY - 4, currentX + 8, currentY + 2, Color.WHITE);
             e.drawLine(currentX + 8, currentY - 4, currentX + 2, currentY + 2, Color.WHITE);
         } else {
-            // Olhos normais atentos
             e.fillCircle(currentX - 5, currentY - 3, 3, Color.WHITE);
             e.fillCircle(currentX + 5, currentY - 3, 3, Color.WHITE);
             e.fillCircle(currentX - 5, currentY - 3, 1.5, Color.BLACK);

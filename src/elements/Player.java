@@ -94,48 +94,51 @@ public class Player implements Characters {
 
     private void desenharCabecaEBarba(EngineFrame e, double px, double py) {
         // Rosto
-        e.fillCircle(px, py - 13, 8, corPele);
+        e.fillCircle(px, py - 14, 8, corPele);
 
-        // Olhos
+        // Olhos bem visíveis abaixo do chapéu
         if (desenhando) {
             // Olhos brilhando de magia quando desenha
-            e.fillCircle(px - 3, py - 14, 2, corCristal);
-            e.fillCircle(px + 3, py - 14, 2, corCristal);
+            e.fillCircle(px - 3, py - 12, 2, corCristal);
+            e.fillCircle(px + 3, py - 12, 2, corCristal);
         } else {
             // Olhos normais
-            e.fillCircle(px - 3, py - 14, 1.5, Color.BLACK);
-            e.fillCircle(px + 3, py - 14, 1.5, Color.BLACK);
+            e.fillCircle(px - 3, py - 12, 1.5, Color.BLACK);
+            e.fillCircle(px + 3, py - 12, 1.5, Color.BLACK);
         }
 
         // Barba branca clássica
         e.fillCircle(px, py - 7, 6, corBarba);
-        e.fillCircle(px - 4, py - 8, 4, corBarba);
-        e.fillCircle(px + 4, py - 8, 4, corBarba);
+        e.fillCircle(px - 4, py - 8, 4.5, corBarba);
+        e.fillCircle(px + 4, py - 8, 4.5, corBarba);
         e.fillCircle(px, py - 4, 3.5, corBarba);
     }
 
     private void desenharChapeu(EngineFrame e, double px, double py) {
-        // Aba do chapéu pontudo
-        e.fillRectangle(px - 15, py - 20, 30, 4, corChapeu);
-        e.drawRectangle(px - 15, py - 20, 30, 4, corChapeu.darker());
-
-        // Fita dourada no chapéu
-        e.fillRectangle(px - 10, py - 23, 20, 3, corFitaChapeu);
-
-        // Cone do chapéu (triângulo subindo)
         double topoX = px + 2 + Math.sin(animTime * 2.0) * 1.5;
-        double topoY = py - 40;
+        double topoY = py - 42;
         
-        // Desenha o formato do chapéu por camadas
-        for (int i = 0; i <= 16; i++) {
-            double frac = i / 16.0;
-            double curY = (py - 23) - (frac * ( (py - 23) - topoY ));
-            double curLargura = (1.0 - frac) * 9.0;
-            e.drawLine(px - curLargura, curY, px + curLargura, curY, corChapeu);
+        // 1. Cone do chapéu (triângulo totalmente sólido encaixado no topo da aba)
+        int startY = (int) (py - 21);
+        int endY = (int) topoY;
+        for (int curY = startY; curY >= endY; curY--) {
+            double frac = (double) (startY - curY) / (startY - endY);
+            double curX = px + (topoX - px) * frac;
+            double curLargura = (1.0 - frac) * 11.0;
+            e.drawLine(curX - curLargura, curY, curX + curLargura, curY, corChapeu);
+            e.drawLine(curX - curLargura, curY + 0.5, curX + curLargura, curY + 0.5, corChapeu);
         }
 
-        // Pompom / Estrelinha na ponta do chapéu
-        e.fillCircle(topoX, topoY, 2.5, corFitaChapeu);
+        // 2. Fita dourada no chapéu (logo acima da aba)
+        e.fillRectangle(px - 10, py - 25, 20, 4, corFitaChapeu);
+        e.drawRectangle(px - 10, py - 25, 20, 4, corFitaChapeu.darker());
+
+        // 3. Aba do chapéu pontudo (assentada sobre a testa, sem cobrir os olhos)
+        e.fillRectangle(px - 15, py - 21, 30, 4, corChapeu);
+        e.drawRectangle(px - 15, py - 21, 30, 4, corChapeu.darker());
+
+        // 4. Pompom / Estrelinha na ponta do chapéu
+        e.fillCircle(topoX, topoY, 3.0, corFitaChapeu);
     }
 
     private void desenharCajado(EngineFrame e, double px, double py) {

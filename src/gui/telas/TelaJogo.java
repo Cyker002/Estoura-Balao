@@ -244,7 +244,7 @@ public class TelaJogo implements Tela {
                     List<Balloon> estourados = inimigo.popMatchingBalloons(simboloDesenhado);
                     for (Balloon b : estourados) {
                         baloesEstourados++;
-                        criarExplosao(inimigo.getX(), inimigo.getY() - 45, b.getColor(), 18);
+                        criarExplosao(inimigo.getX(), inimigo.getY() - 68, b.getColor(), 18);
                     }
                 }
 
@@ -464,17 +464,21 @@ public class TelaJogo implements Tela {
 
         // Mensagem de feedback do traço / estouro de balão com fundo transparente
         if (!feedbackMensagem.isEmpty()) {
-            int badgeW = Math.max(160, feedbackMensagem.length() * 8 + 26);
-            int badgeH = 26;
+            int fontSize = 14;
+            int textWidth = janela.measureText(feedbackMensagem, fontSize);
+            int badgeW = textWidth + 24;
+            int badgeH = 28;
             int badgeX = PAUSE_X + 5;
             int badgeY = 60;
 
             // Fundo transparente neutro com borda sutil
-            janela.fillRectangle(badgeX, badgeY, badgeW, badgeH, new Color(0, 0, 0, 85));
+            janela.fillRectangle(badgeX, badgeY, badgeW, badgeH, new Color(0, 0, 0, 90));
             janela.drawRectangle(badgeX, badgeY, badgeW, badgeH, new Color(255, 255, 255, 60));
 
-            // Texto do log / feedback
-            janela.drawText(feedbackMensagem, badgeX + 10, badgeY + 17, 14, corFeedback);
+            // Texto do log centralizado no meio do retângulo (horizontal e verticalmente)
+            int textX = badgeX + (badgeW - textWidth) / 2;
+            int textY = badgeY + (badgeH - fontSize) / 2;
+            janela.drawText(feedbackMensagem, textX, textY, fontSize, corFeedback);
         }
     }
 
@@ -504,18 +508,29 @@ public class TelaJogo implements Tela {
     private void desenharGameOver(JanelaAtiva janela) {
         janela.fillRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, new Color(0, 0, 0, 200));
 
-        int px = 270;
-        int py = 110;
-        int pw = 400;
+        int pw = 460;
         int ph = 230;
+        int px = (LARGURA_TELA - pw) / 2;
+        int py = (ALTURA_TELA - ph) / 2;
 
         janela.fillRectangle(px, py, pw, ph, new Color(25, 28, 42));
         janela.drawRectangle(px, py, pw, ph, new Color(230, 57, 70));
         janela.drawRectangle(px + 2, py + 2, pw - 4, ph - 4, new Color(230, 57, 70));
 
-        janela.drawText("GAME OVER", px + 110, py + 35, 30, new Color(230, 57, 70));
-        janela.drawText("Pontuação Final: " + pontuacao, px + 105, py + 95, 18, Color.WHITE);
-        janela.drawText("Pressione ESPAÇO para jogar novamente", px + 50, py + 155, 16, Color.YELLOW);
+        // Título GAME OVER centralizado
+        String titulo = "GAME OVER";
+        int tituloW = janela.measureText(titulo, 30);
+        janela.drawText(titulo, px + (pw - tituloW) / 2, py + 35, 30, new Color(230, 57, 70));
+
+        // Pontuação Final centralizada
+        String scoreTexto = "Pontuação Final: " + pontuacao;
+        int scoreW = janela.measureText(scoreTexto, 18);
+        janela.drawText(scoreTexto, px + (pw - scoreW) / 2, py + 95, 18, Color.WHITE);
+
+        // Texto amarelo centralizado com ampla folga dentro da caixa
+        String reiniciarTexto = "Pressione ESPAÇO para jogar novamente";
+        int reiniciarW = janela.measureText(reiniciarTexto, 16);
+        janela.drawText(reiniciarTexto, px + (pw - reiniciarW) / 2, py + 155, 16, Color.YELLOW);
     }
 
     @Override
